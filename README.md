@@ -91,6 +91,35 @@ The judge reaches Claude one of two ways:
    The Bedrock IAM principal needs `bedrock:InvokeModel`, and calls bill your
    AWS account.
 
+## Live website (GitHub Pages)
+
+`docs/` is a **static, client-side** web app — no server. Each visitor pastes
+their *own* Anthropic API key (kept only in their browser's localStorage); the
+whole pipeline (Crossref + Europe PMC retrieval, the judge via a direct call to
+the Anthropic API, the quote-verification guard, threshold, worth-your-read)
+runs in the browser.
+
+Enable it: GitHub → **Settings → Pages → Build and deployment → Deploy from a
+branch → `main` / `docs`**. The site is then served at
+`https://fedor-i.github.io/WorthTheRead/`.
+
+Notes: retrieval uses CORS-enabled endpoints (Crossref, Europe PMC); the judge
+calls the Anthropic API directly from the browser (`anthropic-dangerous-direct-
+browser-access`), so the visitor's key is exposed to the page — standard for a
+bring-your-own-key tool, but say so clearly. Link checks and retraction
+detection work without a key; only the judge step needs one.
+
+## Local web app (FastAPI, self-host)
+
+`worth_your_read/web/` is a server version that keeps the key on the server
+instead of in the browser:
+
+```bash
+pip install "worth-your-read[web] @ git+https://github.com/fedor-i/WorthTheRead.git"
+export ANTHROPIC_API_KEY=sk-ant-...   WYR_USE_BEDROCK=0
+uvicorn worth_your_read.web.app:app --reload   # http://127.0.0.1:8000
+```
+
 ## Smoke test
 
 ```bash

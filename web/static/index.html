@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worth Your Read</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#fff; --ink:#1b1b1a; --muted:#6b6b66; --line:#e3e2dd;
+    --accent:#3b5bdb; --green:#2b8a3e; --amber:#b8860b; --red:#c92a2a; --grey:#868e96;
+    --greenbg:#e5f4e4; --amberbg:#f9eeda; --redbg:#fbebeb; --greybg:#f0efec;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#1a1a19; --panel:#242423; --ink:#ececea; --muted:#9a9a94; --line:#373735;
+      --accent:#91a7ff; --green:#51cf66; --amber:#ffd43b; --red:#ff8787; --grey:#adb5bd;
+      --greenbg:#1c3321; --amberbg:#332d1a; --redbg:#331f1f; --greybg:#2c2c2b;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 16px 80px}
+  h1{font-size:26px;margin:0 0 2px} .sub{color:var(--muted);margin:0 0 22px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:18px;margin-bottom:18px}
+  .panel h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    margin:0 0 12px}
+  label{display:block;font-weight:600;margin:10px 0 4px;font-size:13px}
+  input[type=text],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);
+    border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+  textarea{resize:vertical;min-height:46px}
+  button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px 16px;
+    background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  button.sm{padding:5px 10px;font-size:13px}
+  button:disabled{opacity:.5;cursor:default}
+  .row{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+  .row .grow{flex:1}
+  .muted{color:var(--muted)} .small{font-size:13px}
+  .slider-row{display:flex;align-items:center;gap:12px;margin-top:6px}
+  input[type=range]{flex:1}
+  .badge{display:inline-block;font-weight:700;font-size:12px;padding:3px 9px;border-radius:999px}
+  .b-SUPPORTED{background:var(--greenbg);color:var(--green)}
+  .b-OVERSTATED{background:var(--amberbg);color:var(--amber)}
+  .b-UNSUPPORTED{background:var(--redbg);color:var(--red)}
+  .b-INSUFFICIENT{background:var(--greybg);color:var(--grey)}
+  .card{border:1px solid var(--line);border-left-width:4px;border-radius:10px;
+    padding:14px;margin:10px 0;background:var(--panel)}
+  .card.v-SUPPORTED{border-left-color:var(--green)}
+  .card.v-OVERSTATED{border-left-color:var(--amber)}
+  .card.v-UNSUPPORTED{border-left-color:var(--red)}
+  .card.v-INSUFFICIENT{border-left-color:var(--grey)}
+  .card .meta{color:var(--muted);font-size:12.5px;margin:6px 0}
+  .quote{border-left:3px solid var(--line);margin:8px 0;padding:4px 0 4px 12px;
+    color:var(--ink);font-style:italic}
+  .quote .sec{font-style:normal;color:var(--muted);font-size:12px}
+  .tag{display:inline-block;background:var(--amberbg);color:var(--amber);font-size:12px;
+    padding:2px 8px;border-radius:6px;margin-top:6px}
+  .unmet{font-size:13px;color:var(--muted);margin-top:6px}
+  .wyr li{margin:6px 0}
+  .pill{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--greybg);
+    color:var(--muted);margin-left:6px}
+  .status{color:var(--muted);font-size:13px;margin-left:10px}
+  .overall{font-size:18px;font-weight:700;margin:4px 0 10px}
+  a{color:var(--accent)}
+  .clarifier{margin:10px 0}
+  .plan{background:var(--greybg);border-radius:8px;padding:12px;margin-top:12px;font-size:13.5px}
+  code{background:var(--greybg);padding:1px 5px;border-radius:4px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Worth Your Read</h1>
+  <p class="sub">Verify that claims are actually supported by the papers they cite — then keep only the sources worth reading.</p>
+
+  <!-- 1. PLAN -->
+  <div class="panel">
+    <h2>1 · Plan your search <span class="muted small">(optional)</span></h2>
+    <label>Research question</label>
+    <input type="text" id="question" placeholder="e.g. How does personality affect dropout from a medical trial?">
+    <div style="margin-top:10px">
+      <button class="ghost sm" id="clarifyBtn">Clarify</button>
+      <span class="status" id="planStatus"></span>
+    </div>
+    <div id="clarifiers"></div>
+    <div id="planOut"></div>
+  </div>
+
+  <!-- 2. CLAIMS -->
+  <div class="panel">
+    <h2>2 · Claims to verify</h2>
+    <div id="claims"></div>
+    <button class="ghost sm" id="addClaim">+ Add claim</button>
+
+    <label style="margin-top:16px">Minimum confidence to keep a source</label>
+    <div class="slider-row">
+      <input type="range" id="thr" min="0" max="1" step="0.05" value="0.00">
+      <span id="thrVal" style="font-weight:700;min-width:3ch">0.00</span>
+    </div>
+    <div style="margin-top:14px">
+      <button id="verifyBtn">Verify</button>
+      <span class="status" id="verifyStatus"></span>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (t, c, h) => { const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e; };
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const DIST = {correlation_causation:"correlation→causation",animal_to_human:"animal→human",
+  dropped_caveats:"dropped caveats",effect_size_spin:"effect-size spin",cherry_picking:"cherry-picking"};
+
+async function post(url, body){
+  const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error("HTTP "+r.status+": "+(await r.text()).slice(0,300));
+  return r.json();
+}
+
+/* ---- claims editor ---- */
+function addClaimRow(claim="", ref=""){
+  const row = el("div","row");
+  row.innerHTML =
+    `<div class="grow">
+       <textarea placeholder="Claim (e.g. Higher conscientiousness lowers dropout)">${esc(claim)}</textarea>
+       <input type="text" placeholder="DOI / PMID / PMCID / URL" value="${esc(ref)}" style="margin-top:6px">
+     </div>
+     <button class="ghost sm rm" title="remove">✕</button>`;
+  row.querySelector(".rm").onclick = () => row.remove();
+  $("#claims").appendChild(row);
+}
+$("#addClaim").onclick = () => addClaimRow();
+addClaimRow();
+
+/* ---- threshold ---- */
+$("#thr").oninput = e => $("#thrVal").textContent = Number(e.target.value).toFixed(2);
+
+/* ---- plan: clarify ---- */
+$("#clarifyBtn").onclick = async () => {
+  const q = $("#question").value.trim();
+  if(!q){ $("#planStatus").textContent="enter a question first"; return; }
+  $("#planStatus").textContent="thinking…"; $("#clarifiers").innerHTML=""; $("#planOut").innerHTML="";
+  try{
+    const res = await post("/api/plan",{question:q});
+    $("#planStatus").textContent="";
+    const box = el("div");
+    (res.clarifying_questions||[]).forEach(c=>{
+      const wrap = el("div","clarifier");
+      wrap.appendChild(el("label",null,esc(c.question)));
+      if(c.free_text){
+        const i=el("input"); i.type="text"; i.placeholder="e.g. depression trials (or 'general')"; i.dataset.cid=c.id;
+        wrap.appendChild(i);
+      } else {
+        const s=el("select"); s.dataset.cid=c.id;
+        (c.options||[]).forEach(o=>{const op=el("option",null,esc(o)); op.value=o; s.appendChild(op);});
+        wrap.appendChild(s);
+      }
+      box.appendChild(wrap);
+    });
+    const btn = el("button","ghost sm",null); btn.textContent="Build search plan";
+    btn.onclick = () => buildPlan(q, box);
+    box.appendChild(btn);
+    $("#clarifiers").appendChild(box);
+  }catch(e){ $("#planStatus").textContent=e.message; }
+};
+
+async function buildPlan(q, box){
+  const answers={};
+  box.querySelectorAll("[data-cid]").forEach(x=>{ if(x.value) answers[x.dataset.cid]=x.value; });
+  $("#planStatus").textContent="optimizing…";
+  try{
+    const res = await post("/api/plan",{question:q, answers});
+    $("#planStatus").textContent="";
+    const d = el("div","plan");
+    d.innerHTML = `<b>Search plan</b><br>Gather ~${res.target_sources} candidates · keep confidence ≥ ${res.min_confidence}<br>`+
+      `Study type: ${esc(res.filters.study_type)} · Population: ${esc(res.filters.population)}`+
+      (res.filters.since_year?` · since ${res.filters.since_year}`:"")+
+      `<br><b>Queries</b><ul>`+res.queries.map(x=>`<li><code>${esc(x)}</code></li>`).join("")+`</ul>`;
+    $("#planOut").innerHTML=""; $("#planOut").appendChild(d);
+    // apply the recommended threshold to the slider
+    $("#thr").value = res.min_confidence; $("#thrVal").textContent=Number(res.min_confidence).toFixed(2);
+  }catch(e){ $("#planStatus").textContent=e.message; }
+}
+
+/* ---- verify + score ---- */
+function verdictCard(r){
+  const v = r.verdict || "INSUFFICIENT";
+  const card = el("div","card v-"+v);
+  const res = r.resolved||{};
+  let h = `<span class="badge b-${v}">${v.replace("_"," ")}</span>`+
+    ` <span class="muted small">confidence ${r.band||"?"} (${(r.confidence||0).toFixed(2)})</span>`;
+  const status=[];
+  status.push(r.citation_ok?"link ✓":"link ⚠");
+  if(r.retracted) status.push("<b style='color:var(--red)'>RETRACTED</b>");
+  else if(r.concern) status.push("concern");
+  status.push(r.has_results?"full text ✓":"abstract only ⚠");
+  h += `<div class="meta">${status.join(" · ")}</div>`;
+  h += `<div><b>Claim:</b> ${esc(r.claim)}</div>`;
+  if(res.title){
+    const cite = res.doi ? `<a href="https://doi.org/${esc(res.doi)}" target="_blank" rel="noopener">${esc(res.title)}</a>` : esc(res.title);
+    h += `<div class="meta"><b>Paper:</b> ${cite}${res.year?` (${esc(res.year)})`:""}</div>`;
+  }
+  (r.evidence||[]).slice(0,3).forEach(e=>{
+    h += `<div class="quote">“${esc(e.quote)}”${e.section?` <span class="sec">— §${esc(e.section)}</span>`:""}</div>`;
+  });
+  if(v==="OVERSTATED" && r.distortion_note){
+    h += `<div><span class="tag">${esc(DIST[r.distortion_type]||r.distortion_type||"overstated")}</span> <span class="small">${esc(r.distortion_note)}</span></div>`;
+  }
+  if((r.claim_aspects_unmet||[]).length)
+    h += `<div class="unmet"><b>Not established:</b> ${esc(r.claim_aspects_unmet.join("; "))}</div>`;
+  if(r.downgraded)
+    h += `<div class="unmet"><i>Downgraded to insufficient: no quote could be verified against the source.</i></div>`;
+  card.innerHTML = h;
+  return card;
+}
+
+$("#verifyBtn").onclick = async () => {
+  const claims=[];
+  document.querySelectorAll("#claims .row").forEach(row=>{
+    const claim=row.querySelector("textarea").value.trim();
+    const ref=row.querySelector("input").value.trim();
+    if(claim && ref) claims.push({claim, reference:ref});
+  });
+  if(!claims.length){ $("#verifyStatus").textContent="add at least one claim + reference"; return; }
+  $("#verifyBtn").disabled=true; $("#verifyStatus").textContent=`verifying ${claims.length} claim(s)…`;
+  $("#results").innerHTML="";
+  try{
+    const s = await post("/api/score",{claims, min_confidence:Number($("#thr").value)});
+    $("#verifyStatus").textContent="";
+    const out = el("div","panel");
+    out.appendChild(el("div","overall",
+      `Overall confidence: ${s.overall_confidence.toFixed(2)} (grade ${s.grade}) · ${s.n_claims} claim(s)`));
+    const counts = Object.entries(s.counts||{}).map(([k,v])=>`${k}: ${v}`).join(" · ");
+    if(counts) out.appendChild(el("div","muted small",esc(counts)+
+      (s.min_confidence?` · threshold ${s.min_confidence} (${s.excluded_below_threshold} screened out)`:"")));
+    (s.claims||[]).forEach(r=>out.appendChild(verdictCard(r)));
+    // worth your read
+    const wyr = el("div"); wyr.appendChild(el("h2",null,"Worth your read"));
+    if((s.worth_your_read||[]).length){
+      const ol=el("ol","wyr");
+      s.worth_your_read.forEach(w=>{
+        const li=el("li");
+        const title = w.doi?`<a href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">${esc(w.title)}</a>`:esc(w.title);
+        li.innerHTML = `<b>${title}</b> <span class="pill">${w.verdict} ${(w.confidence||0).toFixed(2)}</span><br><span class="small muted">${esc(w.reason)}</span>`;
+        ol.appendChild(li);
+      });
+      wyr.appendChild(ol);
+    } else wyr.appendChild(el("p","muted","No sources cleared the bar."));
+    out.appendChild(wyr);
+    $("#results").appendChild(out);
+  }catch(e){ $("#verifyStatus").textContent=e.message; }
+  finally{ $("#verifyBtn").disabled=false; }
+};
+</script>
+</body>
+</html>
