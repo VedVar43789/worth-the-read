@@ -12,7 +12,7 @@ Part I of the series surfaced three concerns from the biotech community. This pr
 
 **Team.** Vedant Vardhaan, Cecilia Hahn, Fedor Kuzminov.
 
-**Result.** Best project in the preventing-hallucinations track.
+**Result.** BEST PROJECT IN THE PREVENTING-HALLUCINATIONS TRACK.
 
 The server was scoped to be assembled in about an hour: a resolver, a fetcher, a retraction check, a quote-verified judge, a scorer, and a card renderer. No database, no embeddings, no paywall scraping.
 
