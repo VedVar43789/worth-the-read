@@ -27,25 +27,43 @@ def score_answer(results: list) -> dict:
         score_sum += w
     overall = score_sum / len(results)
 
-    worth = []
+    # Build the ranked list, deduped by source (a paper that supports several
+    # claims appears once, keeping its strongest verdict + a claim count).
+    by_key = {}
     for r in results:
         if r.get("verdict") not in ("SUPPORTED", "OVERSTATED"):
             continue
         if r.get("retracted"):
             continue
         res = r.get("resolved", {})
-        worth.append({
+        key = res.get("doi") or res.get("title") or r.get("reference")
+        entry = {
             "title": res.get("title") or r.get("reference"),
             "doi": res.get("doi"),
             "verdict": r.get("verdict"),
             "confidence": r.get("confidence", 0.0),
             "has_results": r.get("has_results", False),
             "reason": _why(r),
+            "claims_supported": 1,
             "_sort": (_VERDICT_RANK.get(r.get("verdict"), 9),
                       -float(r.get("confidence", 0.0)),
                       0 if r.get("has_results") else 1),
-        })
+        }
+        if key not in by_key:
+            by_key[key] = entry
+        else:
+            prev = by_key[key]
+            count = prev["claims_supported"] + 1
+            # keep the stronger verdict/evidence for display
+            best = entry if entry["_sort"] < prev["_sort"] else prev
+            best["claims_supported"] = count
+            by_key[key] = best
+
+    worth = list(by_key.values())
     worth.sort(key=lambda x: x.pop("_sort"))
+    for w in worth:
+        if w["claims_supported"] > 1:
+            w["reason"] += f" Supports {w['claims_supported']} of the claims."
 
     return {
         "overall_confidence": round(overall, 2),
