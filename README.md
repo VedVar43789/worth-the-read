@@ -4,6 +4,8 @@ Worth Your Read is an [MCP](https://modelcontextprotocol.io) server any AI agent
 
 Built for agents that cite scientific literature: Claude Desktop, Claude Code, and any in-house MCP client.
 
+**Try it.** [Worth Your Read](https://fedor-i.github.io/WorthTheRead/) is the human demo of the same check. Paste a question or a claim and a paper, bring your own Anthropic API key (it stays in your browser), and walk through resolution, retraction, the verdict, and the ranked source list. Link checks and retraction detection work without a key. The judge step needs one.
+
 ## The lab
 
 **Claude Impact Lab**, Part II of the Claude Community Biotech and Life Sciences series. Hosted at Kiln, San Diego, on October 26, 2026.
@@ -213,9 +215,9 @@ Optional environment variables, also listed in `.env.example`:
 
 ## Web surfaces
 
-Two extra ways to run the same pipeline. The lab deliverable is the MCP server.
+The lab deliverable is the MCP server. Two browser apps run the same pipeline for a person.
 
-**Static site** in `docs/`. No server. The visitor supplies their own Anthropic API key, stored in that browser's `localStorage`. Retrieval uses the CORS-enabled Crossref and Europe PMC endpoints. The judge calls the Anthropic API from the browser (`anthropic-dangerous-direct-browser-access`), so the key is visible to the page. Link checks and retraction detection work without a key. To publish: GitHub → Settings → Pages → Deploy from a branch → `main` / `docs`.
+**Live demo:** [https://fedor-i.github.io/WorthTheRead/](https://fedor-i.github.io/WorthTheRead/). This is the walkthrough for humans. The source is the static site in `docs/`: no server, the visitor's Anthropic API key stored only in that browser's `localStorage`. Retrieval uses the CORS-enabled Crossref and Europe PMC endpoints. The judge calls the Anthropic API from the browser (`anthropic-dangerous-direct-browser-access`), so the key is visible to the page. To publish a copy: GitHub → Settings → Pages → Deploy from a branch → `main` / `docs`.
 
 **FastAPI app** in `web/`. The key stays on the server.
 
