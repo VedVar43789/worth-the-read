@@ -23,6 +23,7 @@ from . import fetch as _fetch
 from . import judge as _judge
 from . import score as _score
 from . import render as _render
+from . import plan as _plan
 
 mcp = FastMCP("worth-your-read")
 
@@ -144,6 +145,21 @@ async def score_answer(claims: list, min_confidence: float = 0.0,
     summary["card"] = _render.render_scorecard(summary)
     summary["claims"] = results
     return summary
+
+
+@mcp.tool()
+def plan_search(question: str, answers: dict = None) -> dict:
+    """Clarify-then-optimize a research question before verifying.
+
+    Two-phase and stateless:
+      - Call with just `question` to get clarifying questions (study type,
+        population, recency, confidence bar, breadth) that shape the search.
+      - Present them to the user, then call again with `answers` (keyed by each
+        clarifier id) to get an optimized search plan: query variants, filters,
+        a min_confidence threshold, and a target candidate count to feed into
+        verify_claim / score_answer.
+    """
+    return _plan.plan_search(question, answers)
 
 
 def main():
