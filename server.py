@@ -126,16 +126,21 @@ async def verify_claim(claim: str, reference: str, expected_title: str = "",
 
 
 @mcp.tool()
-async def score_answer(claims: list, ctx: Context = None) -> dict:
+async def score_answer(claims: list, min_confidence: float = 0.0,
+                       ctx: Context = None) -> dict:
     """Score a whole answer. Each item is {claim, reference} (optionally
     expected_title). Verifies every claim, then returns an overall confidence
     score and a ranked "worth your read" source list.
+
+    min_confidence (0-1): sources whose supporting verdict falls below this are
+    screened out of the list entirely, so you can gather many candidate
+    references and keep only the ones that clear your bar.
     """
     results = []
     for c in claims:
         results.append(await _verify(c.get("claim", ""), c.get("reference", ""),
                                      c.get("expected_title", ""), ctx))
-    summary = _score.score_answer(results)
+    summary = _score.score_answer(results, min_confidence=min_confidence)
     summary["card"] = _render.render_scorecard(summary)
     summary["claims"] = results
     return summary

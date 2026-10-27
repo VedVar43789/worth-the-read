@@ -67,6 +67,9 @@ def render_scorecard(s: dict) -> str:
              f"(grade {s['grade']}) across {s['n_claims']} claim(s)"]
     if s.get("counts"):
         lines.append(" · ".join(f"{k}: {v}" for k, v in s["counts"].items()))
+    if s.get("min_confidence"):
+        lines.append(f"Confidence threshold: {s['min_confidence']:.2f} — "
+                     f"{s.get('excluded_below_threshold', 0)} source(s) screened out below it")
     lines.append("")
     lines.append("### Worth your read")
     if not s.get("worth_your_read"):

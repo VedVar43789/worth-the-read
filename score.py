@@ -8,15 +8,20 @@ _VERDICT_RANK = {"SUPPORTED": 0, "OVERSTATED": 1,
                  "INSUFFICIENT": 2, "UNSUPPORTED": 3}
 
 
-def score_answer(results: list) -> dict:
+def score_answer(results: list, min_confidence: float = 0.0) -> dict:
     """results: list of per-claim dicts from verify_claim.
 
-    Returns overall_confidence (0-1), a letter grade, counts by verdict, and
-    worth_your_read: sources that genuinely support claims, best first.
+    min_confidence: drop any source whose supporting verdict is below this
+    confidence from worth_your_read entirely ("don't even show me these").
+
+    Returns overall_confidence (0-1), a letter grade, counts by verdict, the
+    threshold used, how many sources it screened out, and worth_your_read:
+    sources that genuinely support claims at or above the threshold, best first.
     """
     if not results:
         return {"overall_confidence": 0.0, "grade": "N/A", "counts": {},
-                "worth_your_read": [], "n_claims": 0}
+                "worth_your_read": [], "n_claims": 0,
+                "min_confidence": min_confidence, "excluded_below_threshold": 0}
 
     counts = {}
     score_sum = 0.0
@@ -30,10 +35,14 @@ def score_answer(results: list) -> dict:
     # Build the ranked list, deduped by source (a paper that supports several
     # claims appears once, keeping its strongest verdict + a claim count).
     by_key = {}
+    excluded = 0
     for r in results:
         if r.get("verdict") not in ("SUPPORTED", "OVERSTATED"):
             continue
         if r.get("retracted"):
+            continue
+        if float(r.get("confidence", 0.0)) < min_confidence:
+            excluded += 1  # below the caller's threshold: don't surface it
             continue
         res = r.get("resolved", {})
         key = res.get("doi") or res.get("title") or r.get("reference")
@@ -70,6 +79,8 @@ def score_answer(results: list) -> dict:
         "grade": _grade(overall),
         "counts": counts,
         "n_claims": len(results),
+        "min_confidence": min_confidence,
+        "excluded_below_threshold": excluded,
         "worth_your_read": worth,
     }
 
