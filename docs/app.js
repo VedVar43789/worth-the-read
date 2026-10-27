@@ -243,12 +243,33 @@ async function verifyClaim(claim, reference, key, model) {
 const VW = { SUPPORTED:1.0, OVERSTATED:0.4, INSUFFICIENT:0, UNSUPPORTED:0 };
 const VR = { SUPPORTED:0, OVERSTATED:1, INSUFFICIENT:2, UNSUPPORTED:3 };
 function grade(x){ return x>=.85?"A":x>=.7?"B":x>=.5?"C":x>=.3?"D":"F"; }
-function scoreAnswer(results, minConf) {
-  const counts = {}; let sum = 0;
-  for (const r of results) { counts[r.verdict] = (counts[r.verdict]||0)+1; sum += (VW[r.verdict]||0) * (r.confidence||0); }
-  const overall = results.length ? sum/results.length : 0;
+const REVIEW_RE = /systematic review|meta-analysis|meta analysis/i;
+function aggregateClaim(claim, refResults) {
+  const sup = refResults.filter(r => r.verdict === "SUPPORTED");
+  const over = refResults.filter(r => r.verdict === "OVERSTATED");
+  const unsup = refResults.filter(r => r.verdict === "UNSUPPORTED");
+  const verdict = sup.length ? "SUPPORTED" : over.length ? "OVERSTATED" : unsup.length ? "UNSUPPORTED" : "INSUFFICIENT";
+  const support_count = sup.length, total_refs = refResults.length;
+  const hasReview = sup.some(r => REVIEW_RE.test((r.resolved && r.resolved.title) || ""));
+  const strength = (support_count >= 2 || (support_count >= 1 && hasReview)) ? "Strong"
+                 : support_count === 1 ? "Limited" : "None";
+  const pool = sup.length ? sup : over.length ? over : refResults;
+  const confidence = pool.reduce((m, r) => Math.max(m, r.confidence || 0), 0);
+  let recommendation = "";
+  if (["SUPPORTED","OVERSTATED"].includes(verdict) && strength !== "Strong")
+    recommendation = `Backed by only ${support_count} full-support source(s); ≥2 independent sources or a systematic review are recommended for a strong claim.`;
+  return { claim, verdict, confidence, support_count, total_refs, strength, recommendation, refResults };
+}
+function scoreAnswer(claimResults, minConf) {
+  const counts = {}; let sum = 0, weak = 0;
+  for (const cr of claimResults) {
+    counts[cr.verdict] = (counts[cr.verdict]||0)+1;
+    sum += (VW[cr.verdict]||0) * (cr.confidence||0);
+    if (["SUPPORTED","OVERSTATED"].includes(cr.verdict) && cr.strength !== "Strong") weak++;
+  }
+  const overall = claimResults.length ? sum/claimResults.length : 0;
   const byKey = {}; let excluded = 0;
-  for (const r of results) {
+  for (const cr of claimResults) for (const r of cr.refResults) {
     if (!["SUPPORTED","OVERSTATED"].includes(r.verdict) || r.retracted) continue;
     if ((r.confidence||0) < minConf) { excluded++; continue; }
     const res = r.resolved || {};
@@ -265,7 +286,7 @@ function scoreAnswer(results, minConf) {
   const worth = Object.values(byKey).sort((a,b)=> (a._sort<b._sort?-1:a._sort>b._sort?1:0));
   worth.forEach(w => { if (w.claims_supported>1) w.reason += ` Supports ${w.claims_supported} of the claims.`; });
   return { overall_confidence:Math.round(overall*100)/100, grade:grade(overall), counts,
-    n_claims:results.length, min_confidence:minConf, excluded_below_threshold:excluded, worth };
+    n_claims:claimResults.length, weak_claims:weak, min_confidence:minConf, excluded_below_threshold:excluded, worth };
 }
 
 // ---------- plan_search (ported) ----------
@@ -291,6 +312,17 @@ async function epmcSearch(query) {
     return { reference: pick.doi || pick.pmcid, title: pick.title };
   } catch { return null; }
 }
+async function epmcSearchMulti(query, n) {
+  try {
+    const j = await getJSON(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&format=json&resultType=lite&pageSize=12`);
+    const results = (j.resultList && j.resultList.result) || [];
+    // prefer OA hits with DOIs first, then fill with other DOIs/PMCIDs
+    const ordered = [...results.filter(r=>r.doi&&r.isOpenAccess==="Y"), ...results.filter(r=>r.doi&&r.isOpenAccess!=="Y"), ...results.filter(r=>!r.doi&&r.pmcid)];
+    const refs = [], seen = new Set();
+    for (const r of ordered) { const ref = r.doi || r.pmcid; if (!ref || seen.has(ref)) continue; seen.add(ref); refs.push(ref); if (refs.length >= n) break; }
+    return refs;
+  } catch { return []; }
+}
 async function draftClaims(question, key, model) {
   const sys = `You answer a scientific question as 3 to 5 discrete, individually verifiable factual claims. For EACH claim, give a focused literature-search query (a few keywords) that would find a primary paper supporting or refuting it. Return ONLY a JSON object: {"claims":[{"claim":"...","query":"..."}]}. No prose.`;
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -307,12 +339,12 @@ async function draftClaims(question, key, model) {
 }
 
 // ---------- UI wiring ----------
-function addClaimRow(claim="", reference="") {
+function addClaimRow(claim="", references="") {
   const div = document.createElement("div");
   div.className = "claim-row";
   div.innerHTML = `<button class="x" title="remove">×</button>
     <label>Claim</label><textarea class="c-claim" placeholder="A specific factual claim">${esc(claim)}</textarea>
-    <label>Reference (DOI / PMID / PMCID / URL)</label><input type="text" class="c-ref" value="${esc(reference)}" placeholder="10.1234/...">`;
+    <label>References — one per line (DOI / PMID / PMCID / URL)</label><textarea class="c-ref" placeholder="10.1234/...\n10.5678/...">${esc(references)}</textarea>`;
   div.querySelector(".x").onclick = () => div.remove();
   $("claims").appendChild(div);
 }
@@ -330,8 +362,8 @@ $("draftBtn").onclick = async () => {
     $("claims").innerHTML = "";
     for (let i = 0; i < claims.length; i++) {
       $("draftStatus").textContent = `Finding sources… ${i + 1} / ${claims.length}`;
-      const hit = await epmcSearch(claims[i].query || claims[i].claim);
-      addClaimRow(claims[i].claim, hit ? hit.reference : "");
+      const refs = await epmcSearchMulti(claims[i].query || claims[i].claim, 2);
+      addClaimRow(claims[i].claim, refs.join("\n"));
     }
     $("draftStatus").textContent = `Drafted ${claims.length} claims with sources — review, set your threshold, then Verify.`;
   } catch (e) {
@@ -373,7 +405,7 @@ function buildPlan() {
     <p class="hint">Search these (e.g. in PubMed / Europe PMC), then add the best claims + references below and Verify.</p></div>`;
 }
 
-function cardHTML(r) {
+function cardHTML(r, hideClaim=false) {
   const BADGE = { SUPPORTED:"✓ SUPPORTED", OVERSTATED:"⚠ OVERSTATED", UNSUPPORTED:"✗ UNSUPPORTED", INSUFFICIENT:"— INSUFFICIENT EVIDENCE" };
   const res = r.resolved || {};
   const status = [ r.citation_ok?"link ✓":"link ⚠", r.retracted?"<b>RETRACTED</b>":(r.concern?"concern":""), r.has_results?"full text ✓":"abstract only ⚠" ].filter(Boolean).join(" · ");
@@ -383,18 +415,29 @@ function cardHTML(r) {
   let unmet = (r.claim_aspects_unmet||[]).length ? `<p class="meta"><b>Not established:</b> ${esc(r.claim_aspects_unmet.join("; "))}</p>` : "";
   return `<div class="card ${r.verdict}">
     <div><span class="badge ${r.verdict}">${BADGE[r.verdict]}</span> &nbsp;<span class="meta">confidence: ${r.band} (${(r.confidence||0).toFixed(2)}) · ${status}</span></div>
-    <p><b>Claim:</b> ${esc(r.claim)}</p>
+    ${hideClaim ? "" : `<p><b>Claim:</b> ${esc(r.claim)}</p>`}
     ${res.title?`<p class="meta"><b>Paper:</b> ${esc(res.title)}${res.year?` (${esc(res.year)})`:""}${res.doi?` · <a href="https://doi.org/${esc(res.doi)}" target="_blank" rel="noopener">${esc(res.doi)}</a>`:""}</p>`:""}
     ${ev?`<div><b>Verified evidence:</b>${ev}</div>`:""}
     ${why}${dist}${unmet}
+  </div>`;
+}
+function claimCardHTML(cr) {
+  const BADGE = { SUPPORTED:"✓ SUPPORTED", OVERSTATED:"⚠ OVERSTATED", UNSUPPORTED:"✗ UNSUPPORTED", INSUFFICIENT:"— INSUFFICIENT EVIDENCE" };
+  const rec = cr.recommendation ? `<p class="meta" style="color:var(--amber-fg)">⚠ ${esc(cr.recommendation)}</p>` : "";
+  return `<div class="card ${cr.verdict}">
+    <div><span class="badge ${cr.verdict}">${BADGE[cr.verdict]}</span> &nbsp;<span class="meta">supported by <b>${cr.support_count} of ${cr.total_refs}</b> reference(s) · strength: <b>${cr.strength}</b></span></div>
+    <p><b>Claim:</b> ${esc(cr.claim)}</p>
+    ${rec}
+    <div style="margin-left:12px; border-left:2px solid var(--line); padding-left:12px;">${cr.refResults.map(r => cardHTML(r, true)).join("")}</div>
   </div>`;
 }
 function scorecardHTML(s) {
   const wyr = s.worth.length ? `<ol class="wyr">${s.worth.map(w=>`<li><b>${esc(w.title)}</b>${w.doi?` (<a href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">${esc(w.doi)}</a>)`:""} — ${esc(w.reason)}</li>`).join("")}</ol>` : `<p class="meta">No sources cleared the bar.</p>`;
   const counts = Object.entries(s.counts).map(([k,v])=>`${k}: ${v}`).join(" · ");
   const thr = s.min_confidence ? `<div class="meta">Threshold ${s.min_confidence.toFixed(2)} — ${s.excluded_below_threshold} source(s) screened out below it</div>` : "";
+  const weak = s.weak_claims ? `<div class="meta" style="color:var(--amber-fg)">⚠ ${s.weak_claims} claim(s) rest on too few sources (single-source, or no corroborating study / review).</div>` : "";
   return `<div class="scorecard"><div class="big">Overall confidence: ${s.overall_confidence.toFixed(2)} (grade ${s.grade})</div>
-    <div class="meta">${esc(counts)} · ${s.n_claims} claim(s)</div>${thr}
+    <div class="meta">${esc(counts)} · ${s.n_claims} claim(s)</div>${thr}${weak}
     <h2 style="margin-top:14px">Worth your read</h2>${wyr}</div>`;
 }
 
@@ -402,18 +445,24 @@ $("verifyBtn").onclick = async () => {
   const key = $("key").value.trim(), model = $("model").value.trim() || "claude-sonnet-5-5";
   const minConf = Number($("minconf").value);
   const rows = [...$("claims").querySelectorAll(".claim-row")].map(d => ({
-    claim: d.querySelector(".c-claim").value.trim(), reference: d.querySelector(".c-ref").value.trim() }))
-    .filter(x => x.claim && x.reference);
+    claim: d.querySelector(".c-claim").value.trim(),
+    refs: d.querySelector(".c-ref").value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean) }))
+    .filter(x => x.claim && x.refs.length);
   if (!rows.length) { $("results").innerHTML = `<div class="err">Add at least one claim with a reference.</div>`; return; }
   $("verifyBtn").disabled = true; $("results").innerHTML = "";
-  const results = [];
-  for (let i=0;i<rows.length;i++) {
-    $("status").textContent = `Verifying ${i+1} / ${rows.length}…`;
-    try { results.push(await verifyClaim(rows[i].claim, rows[i].reference, key, model)); }
-    catch (e) { results.push({ ...noTextResult(`Error: ${e.message}`), claim:rows[i].claim, reference:rows[i].reference, resolved:{} }); }
-    $("results").innerHTML = results.map(cardHTML).join("");
+  const claimResults = [];
+  const total = rows.reduce((n, r) => n + r.refs.length, 0); let done = 0;
+  for (const row of rows) {
+    const refResults = [];
+    for (const ref of row.refs) {
+      done++; $("status").textContent = `Verifying ${done} / ${total}…`;
+      try { refResults.push(await verifyClaim(row.claim, ref, key, model)); }
+      catch (e) { refResults.push({ ...noTextResult(`Error: ${e.message}`), claim:row.claim, reference:ref, resolved:{} }); }
+    }
+    claimResults.push(aggregateClaim(row.claim, refResults));
+    $("results").innerHTML = claimResults.map(claimCardHTML).join("");
   }
   $("status").textContent = "";
-  $("results").innerHTML = scorecardHTML(scoreAnswer(results, minConf)) + results.map(cardHTML).join("");
+  $("results").innerHTML = scorecardHTML(scoreAnswer(claimResults, minConf)) + claimResults.map(claimCardHTML).join("");
   $("verifyBtn").disabled = false;
 };
