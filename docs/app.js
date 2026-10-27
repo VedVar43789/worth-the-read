@@ -210,7 +210,7 @@ async function judge(claim, fetched, key, model) {
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    body: JSON.stringify({ model, max_tokens: 1500, temperature: 0, system: SYSTEM,
+    body: JSON.stringify({ model, max_tokens: 1500, system: SYSTEM,
       messages: [{ role: "user", content: user }] }),
   });
   if (!r.ok) { const t = await r.text(); return noTextResult(`Anthropic API error ${r.status}: ${t.slice(0,160)}`); }
@@ -296,7 +296,7 @@ async function draftClaims(question, key, model) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type":"application/json", "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
-    body: JSON.stringify({ model, max_tokens: 1200, temperature: 0, system: sys, messages: [{ role:"user", content: question }] }),
+    body: JSON.stringify({ model, max_tokens: 1200, system: sys, messages: [{ role:"user", content: question }] }),
   });
   if (!r.ok) throw new Error(`Anthropic API ${r.status}: ${(await r.text()).slice(0,180)}`);
   const j = await r.json();

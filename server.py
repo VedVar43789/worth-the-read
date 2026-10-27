@@ -43,7 +43,7 @@ async def _run_judge(ctx, claim: str, fetched: dict) -> dict:
                     content=TextContent(type="text",
                                         text=_judge.build_user(claim, fetched)))],
                 system_prompt=_judge.sampling_system(),
-                max_tokens=1500, temperature=0.0,
+                max_tokens=1500,
             )
             text = getattr(res.content, "text", "") or ""
             if text.strip():

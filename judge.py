@@ -229,7 +229,7 @@ def judge_claim(claim: str, fetched: dict) -> dict:
         return no_text_result()
     client, model = _client_and_model()
     msg = client.messages.create(
-        model=model, max_tokens=1500, temperature=0, system=_SYSTEM,
+        model=model, max_tokens=1500, system=_SYSTEM,
         tools=[_TOOL], tool_choice={"type": "tool", "name": "report_verdict"},
         messages=[{"role": "user", "content": build_user(claim, fetched)}],
     )
