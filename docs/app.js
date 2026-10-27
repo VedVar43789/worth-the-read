@@ -279,6 +279,33 @@ const CLARIFIERS = [
   { id:"breadth", q:"How many candidate sources before filtering?", options:["~8 (fast)","~15 (balanced)","~25 (exhaustive)"] },
 ];
 
+// ---------- draft claims from a question + find real sources ----------
+async function epmcSearch(query) {
+  try {
+    const j = await getJSON(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&format=json&resultType=lite&pageSize=5`);
+    const results = (j.resultList && j.resultList.result) || [];
+    // prefer an open-access hit with a DOI, then any DOI, then any PMCID
+    const pick = results.find(r => r.doi && r.isOpenAccess === "Y")
+              || results.find(r => r.doi) || results.find(r => r.pmcid) || results[0];
+    if (!pick) return null;
+    return { reference: pick.doi || pick.pmcid, title: pick.title };
+  } catch { return null; }
+}
+async function draftClaims(question, key, model) {
+  const sys = `You answer a scientific question as 3 to 5 discrete, individually verifiable factual claims. For EACH claim, give a focused literature-search query (a few keywords) that would find a primary paper supporting or refuting it. Return ONLY a JSON object: {"claims":[{"claim":"...","query":"..."}]}. No prose.`;
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type":"application/json", "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+    body: JSON.stringify({ model, max_tokens: 1200, temperature: 0, system: sys, messages: [{ role:"user", content: question }] }),
+  });
+  if (!r.ok) throw new Error(`Anthropic API ${r.status}: ${(await r.text()).slice(0,180)}`);
+  const j = await r.json();
+  let raw = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+  raw = raw.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
+  const s = raw.indexOf("{"), e = raw.lastIndexOf("}"); if (s !== -1 && e !== -1) raw = raw.slice(s, e + 1);
+  return (JSON.parse(raw).claims) || [];
+}
+
 // ---------- UI wiring ----------
 function addClaimRow(claim="", reference="") {
   const div = document.createElement("div");
@@ -291,6 +318,28 @@ function addClaimRow(claim="", reference="") {
 }
 addClaimRow();
 $("addClaim").onclick = () => addClaimRow();
+
+$("draftBtn").onclick = async () => {
+  const q = $("question").value.trim(), key = $("key").value.trim(), model = $("model").value.trim() || "claude-sonnet-5-5";
+  if (!q) { $("clarifyOut").innerHTML = `<div class="err">Type a question first.</div>`; return; }
+  if (!key) { $("clarifyOut").innerHTML = `<div class="err">Add your Anthropic API key above to draft claims.</div>`; return; }
+  $("draftBtn").disabled = true; $("clarifyOut").innerHTML = ""; $("draftStatus").textContent = "Drafting claims…";
+  try {
+    const claims = await draftClaims(q, key, model);
+    if (!claims.length) throw new Error("the model returned no claims.");
+    $("claims").innerHTML = "";
+    for (let i = 0; i < claims.length; i++) {
+      $("draftStatus").textContent = `Finding sources… ${i + 1} / ${claims.length}`;
+      const hit = await epmcSearch(claims[i].query || claims[i].claim);
+      addClaimRow(claims[i].claim, hit ? hit.reference : "");
+    }
+    $("draftStatus").textContent = `Drafted ${claims.length} claims with sources — review, set your threshold, then Verify.`;
+  } catch (e) {
+    $("draftStatus").textContent = "";
+    $("clarifyOut").innerHTML = `<div class="err">Draft failed: ${esc(e.message)}</div>`;
+  }
+  $("draftBtn").disabled = false;
+};
 
 $("clarifyBtn").onclick = () => {
   const q = $("question").value.trim();
