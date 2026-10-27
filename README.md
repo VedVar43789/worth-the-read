@@ -9,14 +9,45 @@ verbatim quotes that are *machine-verified* against the source text.
 The point: give an agent a grounding layer so it stops citing papers that don't
 say what it claims.
 
+## Quick install (for a collaborator)
+
+Install straight from GitHub — no clone needed:
+
+```bash
+pip install "git+https://github.com/fedor-i/WorthTheRead.git"
+```
+
+That installs the `worth-your-read` command (the MCP server). Then wire it into
+an MCP client — e.g. Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "worth-your-read": {
+      "command": "worth-your-read",
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-...", "WYR_USE_BEDROCK": "0" }
+    }
+  }
+}
+```
+
+Restart the client and the three tools appear. If `worth-your-read` isn't on
+your PATH, use its full path (`pip show -f worth-your-read` locates it) or
+`python -m worth_your_read.server`. No API key? If your MCP client supports
+**sampling**, the judge runs on the client's own model — omit `ANTHROPIC_API_KEY`
+and drop `WYR_USE_BEDROCK`.
+
 ## Tools
 
 - **`verify_claim(claim, reference, expected_title="")`** — verify one claim
   against a DOI / PMID / PMCID / URL. Returns structured fields plus a
   ready-to-show markdown `card`.
-- **`score_answer(claims)`** — `claims` is a list of `{claim, reference}`.
-  Verifies each, then returns an overall confidence score and a ranked
-  **"worth your read"** source list.
+- **`score_answer(claims, min_confidence=0.0)`** — `claims` is a list of
+  `{claim, reference}`. Verifies each, then returns an overall confidence score
+  and a ranked **"worth your read"** source list; `min_confidence` screens out
+  sources below your bar.
+- **`plan_search(question, answers=None)`** — clarify-then-optimize: returns
+  clarifying questions, then (with answers) an optimized search plan.
 
 ## How it works
 
