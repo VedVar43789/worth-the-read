@@ -378,6 +378,7 @@ function cardHTML(r) {
   const res = r.resolved || {};
   const status = [ r.citation_ok?"link ✓":"link ⚠", r.retracted?"<b>RETRACTED</b>":(r.concern?"concern":""), r.has_results?"full text ✓":"abstract only ⚠" ].filter(Boolean).join(" · ");
   let ev = (r.evidence||[]).slice(0,3).map(e => `<blockquote>“${esc(e.quote)}”${e.section?` — §${esc(e.section)}`:""}</blockquote>`).join("");
+  let why = r.rationale ? `<p class="meta"><b>Why:</b> ${esc(r.rationale)}</p>` : "";
   let dist = (r.verdict==="OVERSTATED" && r.distortion_note) ? `<p><span class="tag">${esc(DISTORTION_LABELS[r.distortion_type]||r.distortion_type)}</span> ${esc(r.distortion_note)}</p>` : "";
   let unmet = (r.claim_aspects_unmet||[]).length ? `<p class="meta"><b>Not established:</b> ${esc(r.claim_aspects_unmet.join("; "))}</p>` : "";
   return `<div class="card ${r.verdict}">
@@ -385,7 +386,7 @@ function cardHTML(r) {
     <p><b>Claim:</b> ${esc(r.claim)}</p>
     ${res.title?`<p class="meta"><b>Paper:</b> ${esc(res.title)}${res.year?` (${esc(res.year)})`:""}${res.doi?` · <a href="https://doi.org/${esc(res.doi)}" target="_blank" rel="noopener">${esc(res.doi)}</a>`:""}</p>`:""}
     ${ev?`<div><b>Verified evidence:</b>${ev}</div>`:""}
-    ${dist}${unmet}
+    ${why}${dist}${unmet}
   </div>`;
 }
 function scorecardHTML(s) {

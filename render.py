@@ -44,6 +44,10 @@ def render_card(r: dict) -> str:
             sec = e.get("section", "")
             lines.append(f"> “{e['quote']}”" + (f" — §{sec}" if sec else ""))
 
+    if r.get("rationale"):
+        lines.append("")
+        lines.append(f"**Why:** {r['rationale']}")
+
     if r.get("verdict") == "OVERSTATED" and r.get("distortion_note"):
         d = DISTORTION_LABELS.get(r.get("distortion_type"),
                                   r.get("distortion_type") or "")
